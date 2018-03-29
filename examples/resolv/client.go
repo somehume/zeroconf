@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/grandcat/zeroconf"
+	"github.com/ubiquiti/zeroconf"
 )
 
 var (
@@ -25,16 +25,25 @@ func main() {
 	}
 
 	entries := make(chan *zeroconf.ServiceEntry)
+	offline := make(chan *zeroconf.ServiceEntry)
+
 	go func(results <-chan *zeroconf.ServiceEntry) {
 		for entry := range results {
-			log.Println(entry)
+			log.Println("online: ", entry)
 		}
-		log.Println("No more entries.")
+		log.Println("No more online entries.")
 	}(entries)
+
+	go func(results <-chan *zeroconf.ServiceEntry) {
+		for entry := range results {
+			log.Println("offline: ", entry)
+		}
+		log.Println("No more offline entries.")
+	}(offline)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(*waitTime))
 	defer cancel()
-	err = resolver.Browse(ctx, *service, *domain, entries)
+	err = resolver.BrowseWithOffline(ctx, *service, *domain, entries, offline)
 	if err != nil {
 		log.Fatalln("Failed to browse:", err.Error())
 	}

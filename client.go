@@ -107,6 +107,31 @@ func (r *Resolver) Browse(ctx context.Context, service, domain string, entries c
 
 	return nil
 }
+func (r *Resolver) BrowseWithOffline(ctx context.Context, service, domain string, entries chan<- *ServiceEntry, offline chan<- *ServiceEntry) error {
+	params := defaultParams(service)
+	if domain != "" {
+		params.Domain = domain
+	}
+	params.Entries = entries
+	params.Offlines = offline
+	ctx, cancel := context.WithCancel(ctx)
+	go r.c.mainloop(ctx, params)
+
+	err := r.c.query(params)
+	if err != nil {
+		cancel()
+		return err
+	}
+	// If previous probe was ok, it should be fine now. In case of an error later on,
+	// the entries' queue is closed.
+	go func() {
+		if err := r.c.periodicQuery(ctx, params); err != nil {
+			cancel()
+		}
+	}()
+
+	return nil
+}
 
 // Lookup a specific service by its name and type in a given domain.
 func (r *Resolver) Lookup(ctx context.Context, instance, service, domain string, entries chan<- *ServiceEntry) error {
@@ -274,8 +299,12 @@ func (c *client) mainloop(ctx context.Context, params *LookupParams) {
 		if len(entries) > 0 {
 			for k, e := range entries {
 				if e.TTL == 0 {
-					delete(entries, k)
-					delete(sentEntries, k)
+					if se, ok := sentEntries[k]; ok {
+						se.TTL = 0
+						delete(entries, k)
+						delete(sentEntries, k)
+						params.Offlines <- se
+					}
 					continue
 				}
 				if _, ok := sentEntries[k]; ok {

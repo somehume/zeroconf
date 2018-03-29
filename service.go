@@ -63,6 +63,7 @@ func NewServiceRecord(instance, service, domain string) *ServiceRecord {
 type LookupParams struct {
 	ServiceRecord
 	Entries chan<- *ServiceEntry // Entries Channel
+	Offlines chan<- *ServiceEntry //Entries offline channel
 
 	stopProbing chan struct{}
 	once        sync.Once
@@ -73,6 +74,17 @@ func NewLookupParams(instance, service, domain string, entries chan<- *ServiceEn
 	return &LookupParams{
 		ServiceRecord: *NewServiceRecord(instance, service, domain),
 		Entries:       entries,
+		Offlines: make(chan *ServiceEntry),
+
+		stopProbing: make(chan struct{}),
+	}
+}
+
+func NewLookupParamsWithOffline(instance, service, domain string, entries chan<- *ServiceEntry, offline chan <- *ServiceEntry) *LookupParams {
+	return &LookupParams{
+		ServiceRecord: *NewServiceRecord(instance, service, domain),
+		Entries:       entries,
+		Offlines: nil,
 
 		stopProbing: make(chan struct{}),
 	}
@@ -82,6 +94,7 @@ func NewLookupParams(instance, service, domain string, entries chan<- *ServiceEn
 // by an expired context.
 func (l *LookupParams) done() {
 	close(l.Entries)
+	close(l.Offlines)
 }
 
 func (l *LookupParams) disableProbing() {
