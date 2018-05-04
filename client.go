@@ -320,6 +320,10 @@ func (c *client) mainloop(ctx context.Context, params *LookupParams) {
 						continue
 					}
 				}
+				if len(e.Text) == 0 {
+					log.Println("ignore " + e.Instance + " for empty text of entry.")
+					continue
+				}
 				// Submit entry to subscriber and cache it.
 				// This is also a point to possibly stop probing actively for a
 				// service entry.
