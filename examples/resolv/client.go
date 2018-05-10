@@ -43,7 +43,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(*waitTime))
 	defer cancel()
-	err = resolver.BrowseWithOffline(ctx, *service, *domain, entries, offline)
+	err = resolver.BrowseWithEx(ctx, *service, *domain, entries, offline, nil)
 	if err != nil {
 		log.Fatalln("Failed to browse:", err.Error())
 	}

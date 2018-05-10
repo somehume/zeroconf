@@ -14,6 +14,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/miekg/dns"
+	"reflect"
 )
 
 // IPType specifies the IP traffic the client listens for.
@@ -107,13 +108,15 @@ func (r *Resolver) Browse(ctx context.Context, service, domain string, entries c
 
 	return nil
 }
-func (r *Resolver) BrowseWithOffline(ctx context.Context, service, domain string, entries chan<- *ServiceEntry, offline chan<- *ServiceEntry) error {
+
+func (r *Resolver) BrowseWithEx(ctx context.Context, service, domain string, entries chan<- *ServiceEntry, offline chan<- *ServiceEntry, changes chan<- *ServiceEntry) error {
 	params := defaultParams(service)
 	if domain != "" {
 		params.Domain = domain
 	}
 	params.Entries = entries
 	params.Offlines = offline
+	params.Changes = changes
 	ctx, cancel := context.WithCancel(ctx)
 	go r.c.mainloop(ctx, params)
 
@@ -307,9 +310,6 @@ func (c *client) mainloop(ctx context.Context, params *LookupParams) {
 					}
 					continue
 				}
-				if _, ok := sentEntries[k]; ok {
-					continue
-				}
 
 				// If this is an DNS-SD query do not throw PTR away.
 				// It is expected to have only PTR for enumeration
@@ -322,6 +322,13 @@ func (c *client) mainloop(ctx context.Context, params *LookupParams) {
 				}
 				if len(e.Text) == 0 {
 					log.Println("ignore " + e.Instance + " for empty text of entry.")
+					continue
+				}
+				if se, ok := sentEntries[k]; ok {
+					if !reflect.DeepEqual(se.Text, e.Text) {
+						params.Changes <- e
+						sentEntries[k] = e
+					}
 					continue
 				}
 				// Submit entry to subscriber and cache it.

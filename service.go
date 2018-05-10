@@ -62,8 +62,10 @@ func NewServiceRecord(instance, service, domain string) *ServiceRecord {
 // LookupParams contains configurable properties to create a service discovery request
 type LookupParams struct {
 	ServiceRecord
-	Entries chan<- *ServiceEntry // Entries Channel
+
+	Entries chan<- *ServiceEntry  // Entries Channel
 	Offlines chan<- *ServiceEntry //Entries offline channel
+	Changes chan <- *ServiceEntry //Entries change channel
 
 	stopProbing chan struct{}
 	once        sync.Once
